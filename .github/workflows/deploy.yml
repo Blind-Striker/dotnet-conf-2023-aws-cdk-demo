@@ -1,0 +1,43 @@
+name: deploy
+run-name: deploy [${{ github.ref }}] #${{ github.run_number }} (@${{ github.actor }})
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: set aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.IR_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.IR_AWS_SECRET_KEY }}
+          aws-region: ${{ secrets.IR_AWS_REGION }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6.0.x
+
+      - name: setup dotnet aws lambda tools
+        run: dotnet tool install -g Amazon.Lambda.Tools
+
+      - name: install aws cdk
+        run: npm i -g aws-cdk
+
+      - name: build processor lambda
+        run: |
+          cd ./src/processor-lambda && dotnet lambda package
+
+      - name: build query lambda
+        run: |
+          cd ./src/query-lambda && dotnet lambda package
+
+      - name: create cdk stack
+        run: |
+          cd ./cdk
+          cdk synth
+          cdk deploy --require-approval never
